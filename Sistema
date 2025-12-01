@@ -166,7 +166,7 @@ void cadastrarLivro() {
         return;
     }
 
-    fprintf(f, "%d;%s;%s;%d\n", l.id, l.titulo, l.autor, l.ano);
+    fprintf(f, "%d | %s | %s | %d\n", l.id, l.titulo, l.autor, l.ano);
     fclose(f);
 
     printf("\nLivro cadastrado com sucesso!\n");
