@@ -1,0 +1,298 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define ARQUIVO "livros.txt"
+
+typedef struct {
+    int id;
+    char titulo[100];
+    char autor[60];
+    int ano;
+} Livro;
+
+typedef struct No {
+    Livro livro;
+    struct No *prox;
+} No;
+
+
+void enfileirar(No **inicio, No **fim, Livro l) {
+    No *novo = (No *)malloc(sizeof(No));
+    if (!novo) {
+        printf("Erro de memoria!\n");
+        return;
+    }
+    novo->livro = l;
+    novo->prox = NULL;
+
+    if (*fim == NULL) {
+        *inicio = novo;
+        *fim = novo;
+    } else {
+        (*fim)->prox = novo;
+        *fim = novo;
+    }
+}
+
+int desenfileirar(No **inicio, No **fim, Livro *l) {
+    if (*inicio == NULL) return 0;
+
+    No *aux = *inicio;
+    *l = aux->livro;
+    *inicio = aux->prox;
+    if (*inicio == NULL) *fim = NULL;
+    free(aux);
+    return 1;
+}
+
+void esvaziarFila(No **inicio, No **fim) {
+    Livro l;
+    while (desenfileirar(inicio, fim, &l)) { }
+}
+
+
+void salvarFilaEmArquivo(No *inicio) {
+    FILE *f = fopen(ARQUIVO, "w");
+    if (!f) {
+        printf("Erro ao abrir arquivo para escrita!\n");
+        return;
+    }
+
+    No *atual = inicio;
+    while (atual) {
+        Livro l = atual->livro;
+        fprintf(f, "%d;%s;%s;%d\n", l.id, l.titulo, l.autor, l.ano);
+        atual = atual->prox;
+    }
+
+    fclose(f);
+}
+
+void carregarFilaDoArquivo(No **inicio, No **fim) {
+    *inicio = NULL;
+    *fim = NULL;
+
+    FILE *f = fopen(ARQUIVO, "r");
+    if (!f) return;
+
+    char linha[256];
+    while (fgets(linha, sizeof(linha), f)) {
+        Livro l;
+        char *token;
+
+        token = strtok(linha, ";");
+        if (!token) continue;
+        l.id = atoi(token);
+
+        token = strtok(NULL, ";");
+        if (!token) continue;
+        strncpy(l.titulo, token, sizeof(l.titulo));
+        l.titulo[sizeof(l.titulo) - 1] = '\0';
+
+        token = strtok(NULL, ";");
+        if (!token) continue;
+        strncpy(l.autor, token, sizeof(l.autor));
+        l.autor[sizeof(l.autor) - 1] = '\0';
+
+        token = strtok(NULL, ";\n");
+        if (!token) continue;
+        l.ano = atoi(token);
+
+        enfileirar(inicio, fim, l);
+    }
+
+    fclose(f);
+}
+
+
+int existeIdOuTitulo(int id, const char *titulo) {
+    FILE *f = fopen(ARQUIVO, "r");
+    if (!f) return 0;
+
+    char linha[256];
+    while (fgets(linha, sizeof(linha), f)) {
+        Livro l;
+        char *token;
+
+        token = strtok(linha, ";");
+        if (!token) continue;
+        l.id = atoi(token);
+
+        token = strtok(NULL, ";");
+        if (!token) continue;
+        strncpy(l.titulo, token, sizeof(l.titulo));
+        l.titulo[sizeof(l.titulo) - 1] = '\0';
+
+        if (l.id == id || strcmp(l.titulo, titulo) == 0) {
+            fclose(f);
+            return 1;
+        }
+    }
+
+    fclose(f);
+    return 0;
+}
+
+
+void cadastrarLivro() {
+    Livro l;
+
+    printf("\n--- Cadastro de Livro ---\n");
+    printf("ID do livro (numero inteiro): ");
+    scanf("%d", &l.id);
+    getchar();
+
+    printf("Titulo: ");
+    fgets(l.titulo, sizeof(l.titulo), stdin);
+    l.titulo[strcspn(l.titulo, "\n")] = '\0';
+
+    printf("Autor: ");
+    fgets(l.autor, sizeof(l.autor), stdin);
+    l.autor[strcspn(l.autor, "\n")] = '\0';
+
+    printf("Ano de publicacao: ");
+    scanf("%d", &l.ano);
+
+    if (existeIdOuTitulo(l.id, l.titulo)) {
+        printf("\nERRO: Ja existe um livro com este ID ou com este titulo.\n");
+        printf("Cadastro cancelado. Use outro ID e outro titulo.\n");
+        return;
+    }
+
+    FILE *f = fopen(ARQUIVO, "a");
+    if (!f) {
+        printf("Erro ao abrir arquivo para gravacao!\n");
+        return;
+    }
+
+    fprintf(f, "%d;%s;%s;%d\n", l.id, l.titulo, l.autor, l.ano);
+    fclose(f);
+
+    printf("\nLivro cadastrado com sucesso!\n");
+}
+
+void listarLivros() {
+    No *inicio = NULL, *fim = NULL;
+    carregarFilaDoArquivo(&inicio, &fim);
+
+    if (!inicio) {
+        printf("\nNao ha livros cadastrados.\n");
+        return;
+    }
+
+    printf("\n--- Lista de Livros ---\n");
+    No *atual = inicio;
+    while (atual) {
+        Livro l = atual->livro;
+        printf("ID: %d\n", l.id);
+        printf("Titulo: %s\n", l.titulo);
+        printf("Autor: %s\n", l.autor);
+        printf("Ano: %d\n", l.ano);
+        printf("---------------------------\n");
+        atual = atual->prox;
+    }
+
+    esvaziarFila(&inicio, &fim);
+}
+
+void buscarLivro() {
+    int idBusca;
+    printf("\nDigite o ID do livro que deseja buscar: ");
+    scanf("%d", &idBusca);
+
+    No *inicio = NULL, *fim = NULL;
+    carregarFilaDoArquivo(&inicio, &fim);
+
+    if (!inicio) {
+        printf("\nNao ha livros cadastrados.\n");
+        return;
+    }
+
+    int encontrado = 0;
+    No *atual = inicio;
+    while (atual) {
+        Livro l = atual->livro;
+        if (l.id == idBusca) {
+            printf("\nLivro encontrado:\n");
+            printf("ID: %d\n", l.id);
+            printf("Titulo: %s\n", l.titulo);
+            printf("Autor: %s\n", l.autor);
+            printf("Ano: %d\n", l.ano);
+            printf("---------------------------\n");
+            encontrado = 1;
+            break;
+        }
+        atual = atual->prox;
+    }
+
+    if (!encontrado) {
+        printf("\nLivro com ID %d nao encontrado.\n", idBusca);
+    }
+
+    esvaziarFila(&inicio, &fim);
+}
+
+void excluirLivro() {
+    int idExclui;
+    printf("\nDigite o ID do livro que deseja excluir: ");
+    scanf("%d", &idExclui);
+
+    No *inicio = NULL, *fim = NULL;
+    carregarFilaDoArquivo(&inicio, &fim);
+
+    if (!inicio) {
+        printf("\nNao ha livros cadastrados.\n");
+        return;
+    }
+
+    No *novoInicio = NULL, *novoFim = NULL;
+    Livro l;
+    int encontrado = 0;
+
+    while (desenfileirar(&inicio, &fim, &l)) {
+        if (l.id == idExclui) {
+            encontrado = 1;
+        } else {
+            enfileirar(&novoInicio, &novoFim, l);
+        }
+    }
+
+    if (!encontrado) {
+        printf("\nLivro com ID %d nao encontrado. Nada foi excluido.\n", idExclui);
+    } else {
+        salvarFilaEmArquivo(novoInicio);
+        printf("\nLivro com ID %d excluido com sucesso.\n", idExclui);
+    }
+
+    esvaziarFila(&novoInicio, &novoFim);
+}
+
+
+void menu() {
+    int opcao;
+    do {
+        printf("\n====== Sistema de Cadastro de Livros ======\n");
+        printf("1 - Cadastrar livro\n");
+        printf("2 - Listar livros\n");
+        printf("3 - Buscar livro\n");
+        printf("4 - Excluir livro\n");
+        printf("0 - Sair\n");
+        printf("Escolha uma opcao: ");
+        scanf("%d", &opcao);
+
+        switch (opcao) {
+            case 1: cadastrarLivro(); break;
+            case 2: listarLivros();   break;
+            case 3: buscarLivro();    break;
+            case 4: excluirLivro();   break;
+            case 0: printf("\nSaindo do sistema...\n"); break;
+            default: printf("\nOpcao invalida!\n");
+        }
+    } while (opcao != 0);
+}
+
+int main() {
+    menu();
+    return 0;
+}
